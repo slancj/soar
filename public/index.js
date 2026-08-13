@@ -60,7 +60,29 @@ const errorWrap = document.getElementById("sj-error-wrap");
 /** @type {import("/libcurl/index.mjs").default} */
 let LibcurlClient;
 
+async function ensureGlobal(name, timeoutMs = 15000) {
+	if (name in globalThis) return;
+
+	const deadline = Date.now() + timeoutMs;
+	await new Promise((resolve, reject) => {
+		const tick = () => {
+			if (name in globalThis) return resolve();
+			if (Date.now() > deadline)
+				return reject(
+					new Error(
+						`${name} failed to load. Check that its <script> tag loaded correctly.`
+					)
+				);
+			setTimeout(tick, 25);
+		};
+		tick();
+	});
+}
+
 async function initBrowser() {
+	await ensureGlobal("$scramjetController");
+	await ensureGlobal("$scramjetUtils");
+
 	const [{ default: libcurlTransport }, { Controller }, utils] =
 		await Promise.all([
 			import("/libcurl/index.mjs"),
@@ -94,18 +116,24 @@ async function ensureTransport() {
 	transport = new LibcurlClient({ wisp: wispUrl });
 }
 
-async function waitForServiceWorkerController(timeoutMs = 10000) {
-	if (navigator.serviceWorker.controller) return navigator.serviceWorker.controller;
+async function waitForServiceWorkerController(timeoutMs = 15000) {
+	const deadline = Date.now() + timeoutMs;
 
-	const ready = navigator.serviceWorker.ready.then(() => {});
-	const controllerChanged = new Promise((resolve) => {
-		navigator.serviceWorker.addEventListener("controllerchange", resolve, {
-			once: true,
-		});
-	});
-	const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs));
+	while (!navigator.serviceWorker.controller) {
+		if (Date.now() > deadline) break;
 
-	await Promise.race([ready, controllerChanged, timeout]);
+		await Promise.race([
+			navigator.serviceWorker.ready.then(() => {}),
+			new Promise((resolve) => {
+				navigator.serviceWorker.addEventListener(
+					"controllerchange",
+					resolve,
+					{ once: true }
+				);
+			}),
+			new Promise((resolve) => setTimeout(resolve, 500)),
+		]);
+	}
 
 	return navigator.serviceWorker.controller;
 }
@@ -337,8 +365,14 @@ createTab();
 (async () => {
 	const goto = new URL(location.href).searchParams.get("goto");
 	if (goto) {
-		await navigate(goto);
-		history.replaceState(null, "", location.pathname || "/");
+		try {
+			await navigate(goto);
+			history.replaceState(null, "", location.pathname || "/");
+		} catch (err) {
+			error.textContent = "Request failed.";
+			errorCode.textContent = err.toString();
+			errorWrap.hidden = false;
+		}
 	}
 })();
 
