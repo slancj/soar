@@ -1,48 +1,26 @@
-<p align="center"><img src="https://raw.githubusercontent.com/MercuryWorkshop/scramjet/main/assets/scramjet.png" height="200"></p>
+<p align="center"><h1 align="center">Soar</h1></p>
 
-<h1 align="center">Scramjet Demo</h1>
+A lightweight browser frontend for the [Scramjet](https://github.com/MercuryWorkshop/scramjet) web proxy. Soar provides a tabbed, browser-style UI for evading internet censorship and bypassing arbitrary web browser restrictions.
 
-The demo implementation of <a href="https://github.com/MercuryWorkshop/scramjet">Scramjet</a>, the most advanced web proxy.
+## Features
 
-<a href="https://github.com/MercuryWorkshop/scramjet">Scramjet</a> is an experimental interception based web proxy designed with security, developer friendliness, and performance in mind. This project is made to evade internet censorship and bypass arbitrary web browser restrictions.
+- Tabbed browsing with per-tab history, back/forward/reload, and live page titles
+- Address bar with search engine support (DuckDuckGo by default)
+- Full-screen browser layout with a new-tab home page
+- Tabs keep running in the background and don't unload when switched
+- Ad blocking powered by the [Ghostery adblocker engine](https://github.com/ghostery/adblocker) compiled from EasyList and EasyPrivacy, with network-level blocking and element-hiding (cosmetic) filters injected into pages
 
-#### Refer to <a href="https://github.com/HeyPuter/browser.js">browser.js</a> where this project will now receive updates outside of just bypassing internet censorship.
+## Updating the adblock lists
 
-## Supported Sites
+The blocklist engine is pre-built into `public/adblock/` and applied by the service worker. To refresh EasyList/EasyPrivacy and rebuild the assets:
 
-Scramjet has CAPTCHA support! Some of the popular websites that Scramjet supports include:
-
-- [Google](https://google.com)
-- [Twitter](https://twitter.com)
-- [Instagram](https://instagram.com)
-- [Youtube](https://youtube.com)
-- [Spotify](https://spotify.com)
-- [Discord](https://discord.com)
-- [Reddit](https://reddit.com)
-- [GeForce NOW](https://play.geforcenow.com/)
-
-Ensure you are not hosting on a datacenter IP for CAPTCHAs to work reliably along with YouTube. Heavy amounts of traffic will make some sites NOT work on a single IP. Consider rotating IPs or routing through Wireguard using a project like <a href="https://github.com/whyvl/wireproxy">wireproxy</a>.
+```
+pnpm update:adblock
+```
 
 ## Setup / Usage
 
-You will need Node.js 16.x (and above) and Git installed; below is an example for Debian/Ubuntu setup.
-
-```
-sudo apt update
-sudo apt upgrade
-sudo apt install curl git nginx
-
-curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
-
-export NVM_DIR="$HOME/.nvm"
-[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-
-nvm install 20
-nvm use 20
-
-git clone https://github.com/MercuryWorkshop/Scramjet-App
-cd Scramjet-App
-```
+You will need Node.js 16.x (and above) and Git installed.
 
 Install dependencies
 
@@ -56,19 +34,19 @@ Run the server
 pnpm start
 ```
 
-Resources for self-hosting:
+The app will be served on `http://localhost:8080`.
 
-- https://github.com/nvm-sh/nvm
-- https://docs.titaniumnetwork.org/guides/nginx/
-- https://docs.titaniumnetwork.org/guides/vps-hosting/
-- https://docs.titaniumnetwork.org/guides/dns-setup/
+## Supported Sites
 
-### HTTP Transport
+Scramjet has CAPTCHA support. Some of the popular websites that Scramjet supports include:
 
-The example uses [libcurl-transport](https://github.com/MercuryWorkshop/libcurl-transport) to fetch proxied data encrypted.
+- [Google](https://google.com)
+- [Twitter](https://twitter.com)
+- [Instagram](https://instagram.com)
+- [Youtube](https://youtube.com)
+- [Discord](https://discord.com)
+- [Reddit](https://reddit.com)
 
-You may also want to use [epoxy-transport](https://github.com/MercuryWorkshop/epoxy-transport), a different way of fetching encrypted data.
+Ensure you are not hosting on a datacenter IP for CAPTCHAs to work reliably along with YouTube. Heavy amounts of traffic will make some sites NOT work on a single IP. Consider rotating IPs or routing through Wireguard using a project like [wireproxy](https://github.com/whyvl/wireproxy).
 
-This example also now uses [wisp-js/server](https://www.npmjs.com/package/@mercuryworkshop/wisp-js) instead of the now outdated wisp-server-node. Please note that this can also be replaced with other wisp implementations like [wisp-server-python](https://github.com/MercuryWorkshop/wisp-server-python) which is highly recommended for production.
-
-See the [bare-mux](https://github.com/MercuryWorkshop/bare-mux) documentation for more information.
+See the [Scramjet](https://github.com/MercuryWorkshop/scramjet) and [bare-mux](https://github.com/MercuryWorkshop/bare-mux) documentation for more information.
