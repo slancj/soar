@@ -4,7 +4,6 @@ import { hostname } from "node:os";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
-import fastifyCompress from "@fastify/compress";
 
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
 import { libcurlPath } from "@mercuryworkshop/libcurl-transport";
@@ -35,8 +34,6 @@ const fastify = Fastify({
 			});
 	},
 });
-
-fastify.register(fastifyCompress, { global: true });
 
 fastify.register(fastifyStatic, {
 	root: publicPath,
