@@ -1,15 +1,22 @@
 import { createServer } from "node:http";
-import { fileURLToPath } from "url";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
 import { hostname } from "node:os";
 import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 
 import { scramjetPath } from "@mercuryworkshop/scramjet/path";
-import { libcurlPath } from "@mercuryworkshop/libcurl-transport";
-import { baremuxPath } from "@mercuryworkshop/bare-mux/node";
 
 const publicPath = fileURLToPath(new URL("../public/", import.meta.url));
+
+// Resolve the dist directory of each shipped package.
+function pkgDist(specifier) {
+	return dirname(fileURLToPath(import.meta.resolve(specifier)));
+}
+const controllerPath = pkgDist("@mercuryworkshop/scramjet-controller");
+const utilsPath = pkgDist("@mercuryworkshop/scramjet-utils");
+const libcurlPath = pkgDist("@mercuryworkshop/libcurl-transport");
 
 // Wisp Configuration: Refer to the documentation at https://www.npmjs.com/package/@mercuryworkshop/wisp-js
 
@@ -42,19 +49,25 @@ fastify.register(fastifyStatic, {
 
 fastify.register(fastifyStatic, {
 	root: scramjetPath,
-	prefix: "/scram/",
+	prefix: "/scramjet/",
+	decorateReply: false,
+});
+
+fastify.register(fastifyStatic, {
+	root: controllerPath,
+	prefix: "/controller/",
+	decorateReply: false,
+});
+
+fastify.register(fastifyStatic, {
+	root: utilsPath,
+	prefix: "/utils/",
 	decorateReply: false,
 });
 
 fastify.register(fastifyStatic, {
 	root: libcurlPath,
 	prefix: "/libcurl/",
-	decorateReply: false,
-});
-
-fastify.register(fastifyStatic, {
-	root: baremuxPath,
-	prefix: "/baremux/",
 	decorateReply: false,
 });
 

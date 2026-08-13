@@ -57,76 +57,85 @@ const frameHost = document.getElementById("sj-frame-host");
  */
 const errorWrap = document.getElementById("sj-error-wrap");
 
-const { ScramjetController } = $scramjetLoadController();
+/** @type {import("/libcurl/index.mjs").default} */
+let LibcurlClient;
 
-const scramjet = new ScramjetController({
-	files: {
-		wasm: "/scram/scramjet.wasm.wasm",
-		all: "/scram/scramjet.all.js",
-		sync: "/scram/scramjet.sync.js",
-	},
-});
+async function initBrowser() {
+	const [{ default: libcurlTransport }, { Controller }, utils] =
+		await Promise.all([
+			import("/libcurl/index.mjs"),
+			$scramjetController,
+			Promise.resolve($scramjetUtils),
+		]);
+	LibcurlClient = libcurlTransport;
 
-scramjet.init();
+	return {
+		Controller,
+		defaultConfig: $scramjet.defaultConfig,
+		HttpCachePlugin: utils.HttpCachePlugin,
+		UrlWatcherPlugin: utils.UrlWatcherPlugin,
+		CatchEscapedLinksPlugin: utils.CatchEscapedLinksPlugin,
+	};
+}
 
-const connection = new BareMux.BareMuxConnection("/baremux/worker.js");
+/** @type {Awaited<ReturnType<typeof initBrowser>> | null} */
+let browserApi = null;
+/** @type {import("/libcurl/index.mjs").default extends { new (options: infer O): infer T } ? T : never} */
+let transport;
+/** @type {InstanceType<any>} */
+let controller;
 
-/** @type {{ id: number, frame: any, window: Window | null, title: string, lastUrl: string }[]} */
+async function ensureTransport() {
+	const wispUrl =
+		(location.protocol === "https:" ? "wss" : "ws") +
+		"://" +
+		location.host +
+		"/wisp/";
+	transport = new LibcurlClient({ wisp: wispUrl });
+}
+
+/** @type {{ id: number, frame: any, element: HTMLIFrameElement | null, title: string, lastUrl: string }[]} */
 const tabs = [];
 /** @type {typeof tabs[number]} */
 let activeTab = null;
 let tabIdCounter = 1;
 
-function ensureTransport() {
-	let wispUrl =
-		(location.protocol === "https:" ? "wss" : "ws") +
-		"://" +
-		location.host +
-		"/wisp/";
-	return connection.getTransport().then((transport) => {
-		if (transport !== "/libcurl/index.mjs")
-			return connection.setTransport("/libcurl/index.mjs", [
-				{ websocket: wispUrl },
-			]);
-	});
-}
-
 function createScramjetFrame(tab) {
-	const frame = scramjet.createFrame();
-	frame.frame.className = "sj-frame";
-	frame.frame.hidden = true;
-	frame.frame.addEventListener("load", () => {
+	const element = document.createElement("iframe");
+	element.className = "sj-frame";
+	element.hidden = true;
+
+	const urlWatcher = new browserApi.UrlWatcherPlugin((url) => {
+		tab.lastUrl = url;
+		syncTitle(tab);
+		if (tab === activeTab) address.value = url;
+	});
+	const catchEscapedLinks = new browserApi.CatchEscapedLinksPlugin(
+		(url) =>
+			new URL(`/?goto=${encodeURIComponent(url.href)}`, location.origin)
+	);
+	const frame = controller.createFrame(element, {
+		plugins: [urlWatcher, catchEscapedLinks],
+	});
+
+	element.addEventListener("load", () => {
 		syncTitle(tab);
 		if (tab === activeTab) {
 			updateButtons();
 			try {
-				address.value = frame.url.href;
-				tab.lastUrl = address.value;
+				address.value = tab.lastUrl;
 			} catch (err) {
 				// keep current value
 			}
 		}
 	});
-	frame.addEventListener("navigate", (event) => {
-		tab.lastUrl = event.url;
-		syncTitle(tab);
-		if (tab === activeTab) address.value = tab.lastUrl;
-	});
-	frame.addEventListener("urlchange", (event) => {
-		tab.lastUrl = event.url;
-		syncTitle(tab);
-		if (tab === activeTab) address.value = tab.lastUrl;
-	});
-	frame.addEventListener("contextInit", (event) => {
-		tab.window = event.window;
-		syncTitle(tab);
-	});
+
 	return frame;
 }
 
 function currentUrl(tab) {
 	try {
-		return tab.frame.url.href;
+		return tab.lastUrl;
 	} catch (err) {
 		return tab.lastUrl || "";
 	}
@@ -144,7 +153,7 @@ function inferHostname(tab) {
 function syncTitle(tab) {
 	let title = "";
 	try {
-		title = (tab.window?.document?.title || "").trim();
+		title = (tab.frame?.element?.contentWindow?.document?.title || "").trim();
 	} catch (err) {
 		// fall through to hostname
 	}
@@ -195,7 +204,7 @@ function createTab() {
 	const tab = {
 		id: tabIdCounter++,
 		frame: null,
-		window: null,
+		element: null,
 		title: "New Tab",
 		lastUrl: "",
 	};
@@ -210,18 +219,13 @@ function activateTab(tab) {
 	renderTabs();
 
 	for (const t of tabs) {
-		if (t.frame) t.frame.frame.hidden = t !== tab;
+		if (t.frame) t.frame.element.hidden = t !== tab;
 	}
 
 	if (tab.frame) {
 		homeScreen.hidden = true;
 		frameHost.hidden = false;
-		try {
-			address.value = tab.frame.url.href;
-			tab.lastUrl = address.value;
-		} catch (err) {
-			address.value = tab.lastUrl || "";
-		}
+		address.value = tab.lastUrl || "";
 	} else {
 		frameHost.hidden = true;
 		homeScreen.hidden = false;
@@ -238,7 +242,7 @@ function closeTab(tab) {
 
 	const wasActive = tab === activeTab;
 	tabs.splice(index, 1);
-	if (tab.frame) tab.frame.frame.remove();
+	if (tab.frame) tab.frame.element.remove();
 
 	if (tabs.length === 0) {
 		createTab();
@@ -263,34 +267,70 @@ form.addEventListener("submit", async (event) => {
 	event.preventDefault();
 
 	try {
-		await registerSW();
+		await navigate(address.value);
 	} catch (err) {
-		error.textContent = "Failed to register service worker.";
+		error.textContent = "Request failed.";
 		errorCode.textContent = err.toString();
 		errorWrap.hidden = false;
-		throw err;
+	}
+	address.blur();
+});
+
+async function navigate(url) {
+	await registerSW();
+
+	if (!browserApi) browserApi = await initBrowser();
+
+	if (!controller) {
+		console.log("browserApi", browserApi);
+		const registration =
+			navigator.serviceWorker.controller ??
+			(await navigator.serviceWorker.ready).active;
+		if (!registration)
+			throw new Error("No service worker available for controller");
+
+		await ensureTransport();
+
+		controller = new browserApi.Controller({
+			serviceworker: registration,
+			transport,
+			scramjetConfig: browserApi.defaultConfig,
+		});
+		await controller.wait();
+
+		errorWrap.hidden = true;
 	}
 
-	errorWrap.hidden = true;
-
-	const url = search(address.value, searchEngine.value);
+	const target = search(url, searchEngine.value);
 
 	if (!activeTab.frame) {
-		await ensureTransport();
-		activeTab.frame = createScramjetFrame(activeTab);
-		frameHost.appendChild(activeTab.frame.frame);
-		activeTab.lastUrl = url;
+		const frame = createScramjetFrame(activeTab);
+		activeTab.frame = frame;
+		activeTab.element = frame.element;
+		frameHost.appendChild(frame.element);
+		activeTab.lastUrl = target;
 		homeScreen.hidden = true;
 		frameHost.hidden = false;
 		activateTab(activeTab);
 	}
 
-	activeTab.frame.go(url);
-	address.blur();
-});
+	activeTab.frame.go(target);
+	syncTitle(activeTab);
+}
 
 createTab();
-address.focus();
+
+(async () => {
+	const goto = new URL(location.href).searchParams.get("goto");
+	if (goto) {
+		await navigate(goto);
+		history.replaceState(null, "", location.pathname || "/");
+	}
+})();
+
+window.addEventListener("load", () => {
+	for (const tab of tabs) syncTitle(tab);
+});
 
 setInterval(() => {
 	for (const tab of tabs) syncTitle(tab);

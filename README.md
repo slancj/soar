@@ -40,4 +40,4 @@ Scramjet has CAPTCHA support. Some of the popular websites that Scramjet support
 
 Ensure you are not hosting on a datacenter IP for CAPTCHAs to work reliably along with YouTube. Heavy amounts of traffic will make some sites NOT work on a single IP. Consider rotating IPs or routing through Wireguard using a project like [wireproxy](https://github.com/whyvl/wireproxy).
 
-See the [Scramjet](https://github.com/MercuryWorkshop/scramjet) and [bare-mux](https://github.com/MercuryWorkshop/bare-mux) documentation for more information.
+See the [Scramjet](https://github.com/MercuryWorkshop/scramjet), [scramjet-controller](https://github.com/MercuryWorkshop/scramjet-controller), and [libcurl-transport](https://github.com/MercuryWorkshop/libcurl-transport) documentation for more information.
