@@ -4,9 +4,8 @@ ENV NODE_ENV=production
 ARG NPM_BUILD="npm install --omit=dev"
 EXPOSE 8080/tcp
 
-LABEL maintainer="Mercury Workshop"
-LABEL summary="Scramjet Demo Image"
-LABEL description="Example application of Scramjet"
+LABEL summary="Soar Proxy Image"
+LABEL description="Soar web proxy application"
 
 WORKDIR /app
 

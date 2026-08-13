@@ -93,59 +93,55 @@ function ensureTransport() {
 
 function createScramjetFrame(tab) {
 	const frame = scramjet.createFrame();
-	frame.frame.id = "sj-frame";
+	frame.frame.className = "sj-frame";
+	frame.frame.hidden = true;
 	frame.frame.addEventListener("load", () => {
-		updateTitle(tab);
+		syncTitle(tab);
 		if (tab === activeTab) {
 			updateButtons();
 			try {
-				address.value = scramjet.decodeUrl(frame.url);
+				address.value = frame.url.href;
+				tab.lastUrl = address.value;
 			} catch (err) {
 				// keep current value
 			}
 		}
 	});
 	frame.addEventListener("navigate", (event) => {
-		tab.lastUrl = scramjet.decodeUrl(event.url);
-		if (tab === activeTab) {
-			address.value = tab.lastUrl;
-			updateTitle(tab);
-		}
+		tab.lastUrl = event.url;
+		syncTitle(tab);
+		if (tab === activeTab) address.value = tab.lastUrl;
 	});
 	frame.addEventListener("urlchange", (event) => {
-		tab.lastUrl = scramjet.decodeUrl(event.url);
-		if (tab === activeTab) {
-			address.value = tab.lastUrl;
-			updateTitle(tab);
-		}
+		tab.lastUrl = event.url;
+		syncTitle(tab);
+		if (tab === activeTab) address.value = tab.lastUrl;
 	});
 	frame.addEventListener("contextInit", (event) => {
 		tab.window = event.window;
-		try {
-			const observer = new event.window.MutationObserver(() =>
-				updateTitle(tab)
-			);
-			observer.observe(event.window.document.head, {
-				childList: true,
-				subtree: true,
-				characterData: true,
-			});
-		} catch (err) {
-			// title updates won't propagate, hostname will be used instead
-		}
+		syncTitle(tab);
 	});
 	return frame;
 }
 
-function inferHostname(tab) {
+function currentUrl(tab) {
 	try {
-		return new URL(tab.lastUrl || address.value).hostname;
+		return tab.frame.url.href;
+	} catch (err) {
+		return tab.lastUrl || "";
+	}
+}
+
+function inferHostname(tab) {
+	const url = currentUrl(tab) || tab.lastUrl || address.value;
+	try {
+		return new URL(url).hostname;
 	} catch (err) {
 		return "New Tab";
 	}
 }
 
-function updateTitle(tab) {
+function syncTitle(tab) {
 	let title = "";
 	try {
 		title = (tab.window?.document?.title || "").trim();
@@ -213,12 +209,16 @@ function activateTab(tab) {
 	activeTab = tab;
 	renderTabs();
 
+	for (const t of tabs) {
+		if (t.frame) t.frame.frame.hidden = t !== tab;
+	}
+
 	if (tab.frame) {
 		homeScreen.hidden = true;
 		frameHost.hidden = false;
-		frameHost.appendChild(tab.frame.frame);
 		try {
-			address.value = scramjet.decodeUrl(tab.frame.url);
+			address.value = tab.frame.url.href;
+			tab.lastUrl = address.value;
 		} catch (err) {
 			address.value = tab.lastUrl || "";
 		}
@@ -229,7 +229,7 @@ function activateTab(tab) {
 	}
 
 	updateButtons();
-	updateTitle(tab);
+	syncTitle(tab);
 }
 
 function closeTab(tab) {
@@ -278,11 +278,11 @@ form.addEventListener("submit", async (event) => {
 	if (!activeTab.frame) {
 		await ensureTransport();
 		activeTab.frame = createScramjetFrame(activeTab);
+		frameHost.appendChild(activeTab.frame.frame);
 		activeTab.lastUrl = url;
 		homeScreen.hidden = true;
 		frameHost.hidden = false;
-		frameHost.appendChild(activeTab.frame.frame);
-		updateButtons();
+		activateTab(activeTab);
 	}
 
 	activeTab.frame.go(url);
@@ -291,3 +291,7 @@ form.addEventListener("submit", async (event) => {
 
 createTab();
 address.focus();
+
+setInterval(() => {
+	for (const tab of tabs) syncTitle(tab);
+}, 750);

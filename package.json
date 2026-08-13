@@ -16,7 +16,6 @@
 	"keywords": [
 		"proxy"
 	],
-	"author": "Mercury Workshop",
 	"license": "GNU AFFERO",
 	"dependencies": {
 		"fastify": "^5.7.4",
