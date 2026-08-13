@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta
+			name="viewport"
+			content="width=device-width, initial-scale=1.0, shrink-to-fit=no"
+		/>
+		<title>soar</title>
+
+		<link rel="shortcut icon" content="favicon.webp" />
+	
+		<script src="/scram/scramjet.all.js"></script>
+		<script src="/baremux/index.js"></script>
+		
+		<link rel="stylesheet" href="index.css" />
+		<script src="register-sw.js" defer></script>
+		<script src="search.js" defer></script>
+		<script src="index.js" defer></script>
+	</head>
+
+	<body>
+		<nav id="sj-tabstrip">
+			<div id="sj-tabs"></div>
+			<button id="sj-new-tab" title="New tab" type="button">+</button>
+		</nav>
+		<nav id="sj-toolbar">
+			<button id="sj-back" title="Back" type="button" disabled>&#8592;</button>
+			<button id="sj-forward" title="Forward" type="button" disabled>
+				&#8594;
+			</button>
+			<button id="sj-reload" title="Reload" type="button" disabled>
+				&#8635;
+			</button>
+			<form id="sj-form">
+				<input
+					id="sj-search-engine"
+					value="https://duckduckgo.com/?q=%s"
+					type="hidden"
+				/>
+				<input
+					id="sj-address"
+					type="text"
+					placeholder="Search with DuckDuckGo or enter address"
+					autocomplete="off"
+					spellcheck="false"
+				/>
+			</form>
+			<button id="sj-home" title="Home" type="button">&#8962;</button>
+		</nav>
+
+		<div id="sj-frame-host" hidden></div>
+		<div id="sj-home-screen">
+			<h1 class="home-title">soar</h1>
+		</div>
+		<div id="sj-error-wrap" class="desc left-margin" hidden>
+			<p id="sj-error"></p>
+			<pre id="sj-error-code"></pre>
+		</div>
+	</body>
+</html>
