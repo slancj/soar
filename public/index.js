@@ -94,6 +94,22 @@ async function ensureTransport() {
 	transport = new LibcurlClient({ wisp: wispUrl });
 }
 
+async function waitForServiceWorkerController(timeoutMs = 10000) {
+	if (navigator.serviceWorker.controller) return navigator.serviceWorker.controller;
+
+	const ready = navigator.serviceWorker.ready.then(() => {});
+	const controllerChanged = new Promise((resolve) => {
+		navigator.serviceWorker.addEventListener("controllerchange", resolve, {
+			once: true,
+		});
+	});
+	const timeout = new Promise((resolve) => setTimeout(resolve, timeoutMs));
+
+	await Promise.race([ready, controllerChanged, timeout]);
+
+	return navigator.serviceWorker.controller;
+}
+
 /** @type {{ id: number, frame: any, element: HTMLIFrameElement | null, title: string, lastUrl: string }[]} */
 const tabs = [];
 /** @type {typeof tabs[number]} */
@@ -283,16 +299,14 @@ async function navigate(url) {
 
 	if (!controller) {
 		console.log("browserApi", browserApi);
-		const registration =
-			navigator.serviceWorker.controller ??
-			(await navigator.serviceWorker.ready).active;
-		if (!registration)
+		const serviceworker = await waitForServiceWorkerController();
+		if (!serviceworker)
 			throw new Error("No service worker available for controller");
 
 		await ensureTransport();
 
 		controller = new browserApi.Controller({
-			serviceworker: registration,
+			serviceworker,
 			transport,
 			scramjetConfig: browserApi.defaultConfig,
 		});
