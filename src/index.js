@@ -6,9 +6,11 @@ import { server as wisp, logging } from "@mercuryworkshop/wisp-js/server";
 import Fastify from "fastify";
 import fastifyStatic from "@fastify/static";
 
-import { scramjetPath } from "@mercuryworkshop/scramjet/path";
-
 const publicPath = fileURLToPath(new URL("../public/", import.meta.url));
+
+	// Vendored (patched) copy of the scramjet runtime, kept in public/ so the
+	// History proxy rejects undefined/null URLs instead of recording "/undefined".
+	const scramjetPath = resolve(publicPath, "scramjet");
 
 // Resolve the dist directory of each shipped package.
 function pkgDist(specifier) {
