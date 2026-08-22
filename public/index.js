@@ -204,7 +204,6 @@ function syncTitle(tab) {
 	if (!title) title = inferHostname(tab);
 	if (title !== tab.title) {
 		tab.title = title;
-		if (tab === activeTab) document.title = title;
 		renderTabs();
 	}
 }
