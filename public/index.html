@@ -18,6 +18,9 @@
 		<link rel="stylesheet" href="index.css" />
 		<script src="register-sw.js" defer></script>
 		<script src="search.js" defer></script>
+		<script src="adblock/adblocker.bundle.js" defer></script>
+		<script src="adblock/engine.js" defer></script>
+		<script src="adblock/adblock-plugin.js" defer></script>
 		<script src="index.js" defer></script>
 	</head>
 
@@ -49,6 +52,9 @@
 				/>
 			</form>
 			<button id="sj-home" title="Home" type="button">&#8962;</button>
+			<button id="sj-adblock-toggle" title="Adblock on" type="button">
+				&#128737;
+			</button>
 		</nav>
 
 		<div id="sj-frame-host" hidden></div>

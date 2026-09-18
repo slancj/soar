@@ -153,6 +153,11 @@ body {
 	cursor: default;
 }
 
+#sj-adblock-toggle.off {
+	opacity: 0.35;
+	filter: grayscale(1);
+}
+
 #sj-toolbar #sj-form {
 	flex: 1;
 	display: flex;

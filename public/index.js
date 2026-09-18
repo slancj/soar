@@ -39,6 +39,10 @@ const homeButton = document.getElementById("sj-home");
 /**
  * @type {HTMLButtonElement}
  */
+const adblockToggle = document.getElementById("sj-adblock-toggle");
+/**
+ * @type {HTMLButtonElement}
+ */
 const newTabButton = document.getElementById("sj-new-tab");
 /**
  * @type {HTMLDivElement}
@@ -82,6 +86,9 @@ async function ensureGlobal(name, timeoutMs = 15000) {
 async function initBrowser() {
 	await ensureGlobal("$scramjetController");
 	await ensureGlobal("$scramjetUtils");
+	await ensureGlobal("GhosteryAdblocker");
+	await ensureGlobal("Adblock");
+	await ensureGlobal("AdblockPlugin");
 
 	const [{ default: libcurlTransport }, { Controller }, utils] =
 		await Promise.all([
@@ -91,12 +98,21 @@ async function initBrowser() {
 		]);
 	LibcurlClient = libcurlTransport;
 
+	// Non-fatal: the proxy works unblocked if the engine fails to load.
+	try {
+		await window.Adblock.load();
+	} catch (err) {
+		console.error("[adblock] engine failed to load", err);
+	}
+	window.Adblock.updateBadge();
+
 	return {
 		Controller,
 		defaultConfig: $scramjet.defaultConfig,
 		HttpCachePlugin: utils.HttpCachePlugin,
 		UrlWatcherPlugin: utils.UrlWatcherPlugin,
 		CatchEscapedLinksPlugin: utils.CatchEscapedLinksPlugin,
+		AdblockPlugin: window.AdblockPlugin,
 	};
 }
 
@@ -158,8 +174,9 @@ function createScramjetFrame(tab) {
 		(url) =>
 			new URL(`/?goto=${encodeURIComponent(url.href)}`, location.origin)
 	);
+	const adblock = new browserApi.AdblockPlugin(() => tab.lastUrl);
 	const frame = controller.createFrame(element, {
-		plugins: [urlWatcher, catchEscapedLinks],
+		plugins: [urlWatcher, catchEscapedLinks, adblock],
 	});
 
 	element.addEventListener("load", () => {
@@ -305,6 +322,10 @@ forwardButton.addEventListener("click", () => activeTab?.frame?.forward());
 reloadButton.addEventListener("click", () => activeTab?.frame?.reload());
 homeButton.addEventListener("click", showHome);
 newTabButton.addEventListener("click", createTab);
+adblockToggle.addEventListener("click", () => {
+	if (!window.Adblock) return;
+	window.Adblock.setEnabled(!window.Adblock.isEnabled());
+});
 
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
@@ -360,6 +381,9 @@ async function navigate(url) {
 }
 
 createTab();
+
+// Paint the adblock toggle's initial state (engine badge updates itself).
+if (window.Adblock) window.Adblock.updateBadge();
 
 (async () => {
 	const goto = new URL(location.href).searchParams.get("goto");

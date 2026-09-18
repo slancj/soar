@@ -8,10 +8,11 @@ A lightweight browser frontend for the [Scramjet](https://github.com/MercuryWork
 - Address bar with search engine support (DuckDuckGo by default)
 - Full-screen browser layout with a new-tab home page
 - Tabs keep running in the background and don't unload when switched
+- Built-in adblock (EasyList + EasyPrivacy via `@ghostery/adblocker`) with a toolbar toggle
 
 ## Setup / Usage
 
-You will need Node.js 16.x (and above) and Git installed.
+You will need Node.js 22.x (see `.nvmrc`) and Git installed.
 
 Install dependencies
 
@@ -26,6 +27,23 @@ pnpm start
 ```
 
 The app will be served on `http://localhost:8080`.
+
+## Adblock lists
+
+Filter lists are prebuilt into `public/adblock/engine.dat`. Refresh them with:
+
+```
+node scripts/update-adblock-lists.js
+```
+
+Re-run after bumping `@ghostery/adblocker` (serialized engines are version-pinned).
+The library itself is bundled for browsers with:
+
+```
+node scripts/bundle-adblocker.js
+```
+
+which regenerates `public/adblock/adblocker.bundle.js` (re-run after bumps too).
 
 ## Supported Sites
 
