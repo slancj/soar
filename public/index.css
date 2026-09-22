@@ -1,12 +1,35 @@
-@import url("https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,500;1,300;1,400&display=swap");
+:root {
+	color-scheme: dark;
+	--bg: #111214;
+	--surface: #161719;
+	--surface-2: #1d1f23;
+	--border: rgba(255, 255, 255, 0.09);
+	--text: rgba(255, 255, 255, 0.92);
+	--text-dim: rgba(255, 255, 255, 0.6);
+	--text-faint: rgba(255, 255, 255, 0.38);
+	--accent: #8ab4f8;
+	--danger: #ff7a7a;
+	--radius: 10px;
+}
+
+* {
+	box-sizing: border-box;
+}
 
 body {
-	font-family: "Roboto", Arial, Helvetica, sans-serif;
+	font-family:
+		-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Arial,
+		Helvetica, sans-serif;
 	margin: 0;
-	background: #111;
+	background: var(--bg);
+	color: var(--text);
 	display: flex;
 	flex-direction: column;
 	min-height: 100vh;
+}
+
+::selection {
+	background: rgba(138, 180, 248, 0.35);
 }
 
 [hidden] {
@@ -26,19 +49,20 @@ body {
 
 #sj-tabstrip {
 	display: flex;
-	align-items: center;
+	align-items: flex-end;
 	gap: 4px;
-	padding: 6px 8px 0;
-	background: #0d0d0d;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	padding: 8px 10px 0;
+	background: #0c0d0f;
+	border-bottom: 1px solid var(--border);
 }
 
 #sj-tabs {
 	display: flex;
-	gap: 4px;
+	gap: 6px;
 	overflow-x: auto;
 	scrollbar-width: none;
 	flex: 1;
+	padding-bottom: 0;
 }
 
 #sj-tabs::-webkit-scrollbar {
@@ -48,27 +72,33 @@ body {
 .sj-tab {
 	display: flex;
 	align-items: center;
-	gap: 6px;
-	max-width: 180px;
-	min-width: 80px;
-	padding: 7px 10px;
-	border-radius: 8px 8px 0 0;
+	gap: 8px;
+	max-width: 200px;
+	min-width: 96px;
+	padding: 8px 10px 8px 12px;
+	border-radius: var(--radius) var(--radius) 0 0;
 	font-size: 13px;
-	color: rgba(255, 255, 255, 0.75);
+	color: var(--text-dim);
 	cursor: pointer;
 	user-select: none;
+	background: transparent;
 	border: 1px solid transparent;
 	border-bottom: none;
+	transition:
+		background 0.12s ease,
+		color 0.12s ease;
 }
 
 .sj-tab:hover {
 	background: rgba(255, 255, 255, 0.06);
+	color: var(--text);
 }
 
 .sj-tab.active {
-	background: #161616;
-	color: #fff;
-	border-color: rgba(255, 255, 255, 0.08);
+	background: var(--surface);
+	color: var(--text);
+	border-color: var(--border);
+	box-shadow: inset 0 2px 0 var(--accent);
 }
 
 .sj-tab-title {
@@ -82,13 +112,16 @@ body {
 	background: none;
 	border: none;
 	color: inherit;
-	font-size: 14px;
+	font-size: 15px;
 	line-height: 1;
-	padding: 2px 4px;
-	border-radius: 4px;
+	padding: 2px 6px;
+	border-radius: 6px;
 	cursor: pointer;
 	opacity: 0;
 	flex-shrink: 0;
+	transition:
+		opacity 0.12s ease,
+		background 0.12s ease;
 }
 
 .sj-tab:hover .sj-tab-close {
@@ -96,37 +129,41 @@ body {
 }
 
 .sj-tab.active .sj-tab-close {
-	opacity: 0.7;
+	opacity: 0.6;
 }
 
 .sj-tab-close:hover {
 	opacity: 1 !important;
-	background: rgba(255, 255, 255, 0.12);
+	background: rgba(255, 255, 255, 0.14);
 }
 
 #sj-new-tab {
 	background: none;
-	border: none;
-	color: #fff;
+	border: 1px solid transparent;
+	color: var(--text-dim);
 	font-size: 18px;
 	line-height: 1;
 	cursor: pointer;
-	padding: 6px 10px;
+	padding: 4px 10px 8px;
 	border-radius: 8px;
 	flex-shrink: 0;
+	transition:
+		background 0.12s ease,
+		color 0.12s ease;
 }
 
 #sj-new-tab:hover {
 	background: rgba(255, 255, 255, 0.08);
+	color: var(--text);
 }
 
 #sj-toolbar {
 	display: flex;
 	align-items: center;
-	gap: 4px;
+	gap: 2px;
 	padding: 8px 12px;
-	background: #0d0d0d;
-	border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+	background: var(--surface);
+	border-bottom: 1px solid var(--border);
 	position: sticky;
 	top: 0;
 	z-index: 1000;
@@ -135,22 +172,36 @@ body {
 #sj-toolbar button {
 	background: none;
 	border: none;
-	color: #fff;
-	font-size: 20px;
+	color: var(--text-dim);
+	font-size: 18px;
 	line-height: 1;
 	cursor: pointer;
-	padding: 8px 11px;
-	border-radius: 8px;
+	width: 36px;
+	height: 36px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	border-radius: 9px;
 	flex-shrink: 0;
+	transition:
+		background 0.12s ease,
+		color 0.12s ease,
+		opacity 0.12s ease;
 }
 
 #sj-toolbar button:hover:not(:disabled) {
-	background: rgba(255, 255, 255, 0.08);
+	background: rgba(255, 255, 255, 0.09);
+	color: var(--text);
 }
 
 #sj-toolbar button:disabled {
-	color: #444;
+	color: var(--text-faint);
+	opacity: 0.45;
 	cursor: default;
+}
+
+#sj-adblock-toggle {
+	font-size: 16px !important;
 }
 
 #sj-adblock-toggle.off {
@@ -161,7 +212,7 @@ body {
 #sj-toolbar #sj-form {
 	flex: 1;
 	display: flex;
-	margin: 0;
+	margin: 0 6px;
 }
 
 #sj-frame-host {
@@ -173,16 +224,35 @@ body {
 #sj-home-screen {
 	flex: 1;
 	display: flex;
+	flex-direction: column;
 	align-items: center;
 	justify-content: center;
+	gap: 10px;
+	padding: 24px;
+	text-align: center;
+	background:
+		radial-gradient(
+			ellipse 60% 45% at 50% 38%,
+			rgba(138, 180, 248, 0.09),
+			transparent 70%
+		),
+		var(--bg);
 }
 
 .home-title {
 	margin: 0;
-	font-size: 72px;
-	font-weight: 300;
-	color: rgba(255, 255, 255, 0.87);
-	letter-spacing: 2px;
+	font-size: clamp(48px, 8vw, 76px);
+	font-weight: 650;
+	color: var(--text);
+	letter-spacing: 4px;
+	user-select: none;
+}
+
+.home-sub {
+	margin: 0;
+	font-size: 14px;
+	color: var(--text-faint);
+	letter-spacing: 0.4px;
 	user-select: none;
 }
 
@@ -197,50 +267,77 @@ body {
 	left: 0;
 	width: 100%;
 	height: 100%;
-	background-color: #111;
+	background-color: var(--bg);
 }
 
 #sj-error {
-	color: #ff6666 !important;
+	color: var(--danger) !important;
 	white-space: pre-wrap;
+	margin: 0 0 8px;
 }
 
 #sj-error-code {
 	font-size: 12px;
-	color: #fff;
-	font-family: "Courier New", Courier, monospace;
+	color: var(--text);
+	font-family: ui-monospace, "Cascadia Code", "Courier New", Courier, monospace;
 	margin: 0;
+	max-height: 40vh;
+	overflow: auto;
 }
 
 #sj-error-wrap {
 	position: fixed;
-	top: 100px;
-	left: 0;
-	right: 0;
+	top: 110px;
+	left: 50%;
+	right: auto;
+	transform: translateX(-50%);
 	z-index: 1001;
+	width: min(560px, calc(100vw - 48px));
+	background: var(--surface-2);
+	border: 1px solid rgba(255, 122, 122, 0.4);
+	border-radius: 12px;
+	padding: 14px 16px;
+	box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
 }
 
 #sj-address {
-	background: #1a1a1a;
-	font-family: inherit;
-	padding: 0px 17px;
+	background: #202227;
+	padding: 0 18px;
 	height: 38px;
-	border: 1px solid rgb(255, 255, 255, 0.2);
-	color: var(--text-color);
-	border-radius: 3px;
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	border-radius: 999px;
 	outline: none;
 	width: 100%;
 	margin-top: 0;
-	border-radius: 50px;
-	color: #fff;
-	transition: border-radius 0.1s;
-	font-size: 15px;
+	color: var(--text);
+	transition:
+		border-color 0.12s ease,
+		background 0.12s ease,
+		box-shadow 0.12s ease;
+	font-size: 14.5px;
+	font-family: inherit;
+}
+
+#sj-address::placeholder {
+	color: var(--text-faint);
+}
+
+#sj-address:hover {
+	border-color: rgba(255, 255, 255, 0.24);
 }
 
 #sj-address:focus {
-	border: 1px solid rgba(253, 253, 253, 0.514);
-	border-radius: 6px;
-	background: #111;
+	border-color: var(--accent);
+	background: #191b1f;
+	box-shadow: 0 0 0 3px rgba(138, 180, 248, 0.18);
+}
+
+#sj-toolbar button:focus-visible,
+#sj-address:focus-visible,
+.sj-tab:focus-visible,
+.sj-tab-close:focus-visible {
+	outline: 2px solid var(--accent);
+	outline-offset: 1px;
 }
 
 .credit {
@@ -282,4 +379,25 @@ body {
 
 .credit input:checked ~ pre {
 	display: block;
+}
+
+@media (max-width: 640px) {
+	#sj-toolbar {
+		padding: 6px 8px;
+	}
+
+	#sj-toolbar button {
+		width: 32px;
+		height: 32px;
+		font-size: 16px;
+	}
+
+	.sj-tab {
+		min-width: 64px;
+		max-width: 140px;
+	}
+
+	.home-title {
+		letter-spacing: 2px;
+	}
 }
