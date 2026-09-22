@@ -5,7 +5,7 @@ A lightweight browser frontend for the [Scramjet](https://github.com/MercuryWork
 ## Features
 
 - Tabbed browsing with per-tab history, back/forward/reload, and live page titles
-- Address bar with search engine support (DuckDuckGo by default)
+- Address bar with search engine support (Startpage by default)
 - Full-screen browser layout with a new-tab home page
 - Tabs keep running in the background and don't unload when switched
 - Built-in adblock (EasyList + EasyPrivacy via `@ghostery/adblocker`) with a toolbar toggle
