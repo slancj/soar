@@ -22,6 +22,7 @@
 		<script src="adblock/adblocker.bundle.js" defer></script>
 		<script src="adblock/engine.js" defer></script>
 		<script src="adblock/adblock-plugin.js" defer></script>
+		<script src="darkmode/darkmode-plugin.js" defer></script>
 		<script src="index.js" defer></script>
 	</head>
 
@@ -39,11 +40,19 @@
 				&#8635;
 			</button>
 			<form id="sj-form">
-				<input
+				<select
 					id="sj-search-engine"
-					value="https://www.startpage.com/sp/search?query=%s"
-					type="hidden"
-				/>
+					title="Search engine"
+					aria-label="Search engine"
+				>
+					<option value="https://www.startpage.com/sp/search?query=%s">
+						Startpage
+					</option>
+					<option value="https://search.brave.com/search?q=%s">Brave</option>
+					<option value="https://www.mojeek.com/search?q=%s">Mojeek</option>
+					<option value="https://www.google.com/search?q=%s">Google</option>
+					<option value="https://duckduckgo.com/?q=%s">DuckDuckGo</option>
+				</select>
 				<input
 					id="sj-address"
 					type="text"
@@ -53,6 +62,9 @@
 				/>
 			</form>
 			<button id="sj-home" title="Home" type="button">&#8962;</button>
+			<button id="sj-theme-toggle" title="Switch to light theme" type="button">
+				&#9680;
+			</button>
 			<button id="sj-adblock-toggle" title="Adblock on" type="button">
 				&#128737;
 			</button>

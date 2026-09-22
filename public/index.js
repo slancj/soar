@@ -8,7 +8,7 @@ const form = document.getElementById("sj-form");
  */
 const address = document.getElementById("sj-address");
 /**
- * @type {HTMLInputElement}
+ * @type {HTMLSelectElement}
  */
 const searchEngine = document.getElementById("sj-search-engine");
 /**
@@ -40,6 +40,10 @@ const homeButton = document.getElementById("sj-home");
  * @type {HTMLButtonElement}
  */
 const adblockToggle = document.getElementById("sj-adblock-toggle");
+/**
+ * @type {HTMLButtonElement}
+ */
+const themeToggle = document.getElementById("sj-theme-toggle");
 /**
  * @type {HTMLButtonElement}
  */
@@ -89,6 +93,7 @@ async function initBrowser() {
 	await ensureGlobal("GhosteryAdblocker");
 	await ensureGlobal("Adblock");
 	await ensureGlobal("AdblockPlugin");
+	await ensureGlobal("DarkModePlugin");
 
 	const [{ default: libcurlTransport }, { Controller }, utils] =
 		await Promise.all([
@@ -113,6 +118,7 @@ async function initBrowser() {
 		UrlWatcherPlugin: utils.UrlWatcherPlugin,
 		CatchEscapedLinksPlugin: utils.CatchEscapedLinksPlugin,
 		AdblockPlugin: window.AdblockPlugin,
+		DarkModePlugin: window.DarkModePlugin,
 	};
 }
 
@@ -141,11 +147,9 @@ async function waitForServiceWorkerController(timeoutMs = 15000) {
 		await Promise.race([
 			navigator.serviceWorker.ready.then(() => {}),
 			new Promise((resolve) => {
-				navigator.serviceWorker.addEventListener(
-					"controllerchange",
-					resolve,
-					{ once: true }
-				);
+				navigator.serviceWorker.addEventListener("controllerchange", resolve, {
+					once: true,
+				});
 			}),
 			new Promise((resolve) => setTimeout(resolve, 500)),
 		]);
@@ -154,7 +158,10 @@ async function waitForServiceWorkerController(timeoutMs = 15000) {
 	return navigator.serviceWorker.controller;
 }
 
-/** @type {{ id: number, frame: any, element: HTMLIFrameElement | null, title: string, lastUrl: string }[]} */
+/** Time to wait for a proxied page before reporting a stall. */
+const LOAD_TIMEOUT_MS = 30000;
+
+/** @type {{ id: number, frame: any, element: HTMLIFrameElement | null, title: string, lastUrl: string, loading: boolean, loadTimer: number }[]} */
 const tabs = [];
 /** @type {typeof tabs[number]} */
 let activeTab = null;
@@ -171,15 +178,34 @@ function createScramjetFrame(tab) {
 		if (tab === activeTab) address.value = url;
 	});
 	const catchEscapedLinks = new browserApi.CatchEscapedLinksPlugin(
-		(url) =>
-			new URL(`/?goto=${encodeURIComponent(url.href)}`, location.origin)
+		(url) => new URL(`/?goto=${encodeURIComponent(url.href)}`, location.origin)
 	);
 	const adblock = new browserApi.AdblockPlugin(() => tab.lastUrl);
+	const darkmode = new browserApi.DarkModePlugin(
+		// Shell theme drives pages both ways — read live so the toggle
+		// applies on next load without rebuilding frames.
+		() => loadTheme(),
+		// Verbose per-page logs. Enable with
+		// `localStorage.setItem("sj-debug", "1")` in the outer console.
+		(() => {
+			try {
+				return localStorage.getItem("sj-debug") === "1";
+			} catch (err) {
+				return false;
+			}
+		})()
+	);
 	const frame = controller.createFrame(element, {
-		plugins: [urlWatcher, catchEscapedLinks, adblock],
+		plugins: [urlWatcher, catchEscapedLinks, adblock, darkmode],
 	});
 
 	element.addEventListener("load", () => {
+		tab.loading = false;
+		if (tab.loadTimer) {
+			clearTimeout(tab.loadTimer);
+			tab.loadTimer = 0;
+		}
+		renderTabs();
 		syncTitle(tab);
 		if (tab === activeTab) {
 			updateButtons();
@@ -189,6 +215,21 @@ function createScramjetFrame(tab) {
 				// keep current value
 			}
 		}
+
+		// The service worker answers same-origin, so a proxy failure page
+		// ("Internal Service Worker Error: ...") is readable here. An
+		// iframe `load` fires for error pages too, so check explicitly.
+		try {
+			const text = (element.contentDocument?.body?.textContent || "").trim();
+			if (text.startsWith("Internal Service Worker Error")) {
+				if (tab === activeTab)
+					showError("Proxy request failed.", text.slice(0, 500));
+				return;
+			}
+		} catch (err) {
+			// not readable (cross-origin or not ready) — ignore
+		}
+		if (tab === activeTab) clearError();
 	});
 
 	return frame;
@@ -234,7 +275,17 @@ function updateButtons() {
 
 function renderTab(tab) {
 	const el = document.createElement("div");
-	el.className = "sj-tab" + (tab === activeTab ? " active" : "");
+	el.className =
+		"sj-tab" +
+		(tab === activeTab ? " active" : "") +
+		(tab.loading ? " loading" : "");
+
+	if (tab.loading) {
+		const spin = document.createElement("span");
+		spin.className = "sj-tab-spinner";
+		spin.setAttribute("aria-hidden", "true");
+		el.appendChild(spin);
+	}
 
 	const title = document.createElement("span");
 	title.className = "sj-tab-title";
@@ -267,6 +318,8 @@ function createTab() {
 		element: null,
 		title: "New Tab",
 		lastUrl: "",
+		loading: false,
+		loadTimer: 0,
 	};
 	tabs.push(tab);
 	renderTabs();
@@ -302,6 +355,7 @@ function closeTab(tab) {
 
 	const wasActive = tab === activeTab;
 	tabs.splice(index, 1);
+	if (tab.loadTimer) clearTimeout(tab.loadTimer);
 	if (tab.frame) tab.frame.element.remove();
 
 	if (tabs.length === 0) {
@@ -317,6 +371,81 @@ function showHome() {
 	createTab();
 }
 
+function showError(message, detail) {
+	error.textContent = message;
+	errorCode.textContent = detail || "";
+	errorWrap.hidden = false;
+}
+
+function clearError() {
+	errorWrap.hidden = true;
+}
+
+const THEME_KEY = "sj-theme";
+const ENGINE_KEY = "sj-engine";
+
+function applyTheme(theme) {
+	document.documentElement.dataset.theme = theme;
+	try {
+		localStorage.setItem(THEME_KEY, theme);
+	} catch (err) {
+		// private mode etc. — theme just won't persist
+	}
+	const meta = document.querySelector("meta[name='theme-color']");
+	if (meta) meta.content = theme === "light" ? "#f1f3f4" : "#0d0d0d";
+	themeToggle.textContent = theme === "light" ? "◑" : "◐";
+	themeToggle.title =
+		theme === "light" ? "Switch to dark theme" : "Switch to light theme";
+}
+
+function loadTheme() {
+	try {
+		return localStorage.getItem(THEME_KEY) || "dark";
+	} catch (err) {
+		return "dark";
+	}
+}
+
+function engineName() {
+	const selected = searchEngine.selectedOptions[0];
+	return selected ? selected.textContent.trim() : "Startpage";
+}
+
+function syncEnginePlaceholder() {
+	address.placeholder = `Search with ${engineName()} or enter address`;
+}
+
+try {
+	const saved = localStorage.getItem(ENGINE_KEY);
+	if (
+		saved &&
+		[...searchEngine.options].some((option) => option.value === saved)
+	) {
+		searchEngine.value = saved;
+	}
+} catch (err) {
+	// ignore — default engine stands
+}
+syncEnginePlaceholder();
+applyTheme(loadTheme());
+
+searchEngine.addEventListener("change", () => {
+	try {
+		localStorage.setItem(ENGINE_KEY, searchEngine.value);
+	} catch (err) {
+		// ignore
+	}
+	syncEnginePlaceholder();
+});
+
+themeToggle.addEventListener("click", () => {
+	const next = loadTheme() === "light" ? "dark" : "light";
+	applyTheme(next);
+	// Page forcing follows the shell theme and applies at page init —
+	// reload open tabs to apply now.
+	for (const tab of tabs) tab.frame?.reload();
+});
+
 backButton.addEventListener("click", () => activeTab?.frame?.back());
 forwardButton.addEventListener("click", () => activeTab?.frame?.forward());
 reloadButton.addEventListener("click", () => activeTab?.frame?.reload());
@@ -326,16 +455,13 @@ adblockToggle.addEventListener("click", () => {
 	if (!window.Adblock) return;
 	window.Adblock.setEnabled(!window.Adblock.isEnabled());
 });
-
 form.addEventListener("submit", async (event) => {
 	event.preventDefault();
 
 	try {
 		await navigate(address.value);
 	} catch (err) {
-		error.textContent = "Request failed.";
-		errorCode.textContent = err.toString();
-		errorWrap.hidden = false;
+		showError("Request failed.", err.toString());
 	}
 	address.blur();
 });
@@ -376,13 +502,30 @@ async function navigate(url) {
 		activateTab(activeTab);
 	}
 
-	activeTab.frame.go(target);
-	syncTitle(activeTab);
+	const tab = activeTab;
+	tab.frame.go(target);
+	tab.lastUrl = target;
+	tab.loading = true;
+	renderTabs();
+	clearError();
+	if (tab.loadTimer) clearTimeout(tab.loadTimer);
+	tab.loadTimer = setTimeout(() => {
+		if (!tab.loading) return;
+		tab.loading = false;
+		tab.loadTimer = 0;
+		renderTabs();
+		if (tab !== activeTab) return;
+		showError(
+			"Request timed out.",
+			`${target}\n\nThe proxy never responded. The host may be blocking this site (common on shared hosting IPs), or the Wisp connection dropped. Check the server logs, then retry or try another search engine.`
+		);
+	}, LOAD_TIMEOUT_MS);
+	syncTitle(tab);
 }
 
 createTab();
 
-// Paint the adblock toggle's initial state (engine badge updates itself).
+// Paint the toggle initial states (engine badge updates itself).
 if (window.Adblock) window.Adblock.updateBadge();
 
 (async () => {
@@ -392,9 +535,7 @@ if (window.Adblock) window.Adblock.updateBadge();
 			await navigate(goto);
 			history.replaceState(null, "", location.pathname || "/");
 		} catch (err) {
-			error.textContent = "Request failed.";
-			errorCode.textContent = err.toString();
-			errorWrap.hidden = false;
+			showError("Request failed.", err.toString());
 		}
 	}
 })();

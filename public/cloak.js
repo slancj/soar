@@ -43,7 +43,11 @@
 			theme.name = "theme-color";
 			document.head.appendChild(theme);
 		}
-		theme.content = "#0d0d0d";
+		const next =
+			document.documentElement.dataset.theme === "light"
+				? "#f1f3f4"
+				: "#0d0d0d";
+		if (theme.content !== next) theme.content = next;
 	}
 
 	apply();
