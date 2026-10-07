@@ -94,6 +94,8 @@ async function initBrowser() {
 	await ensureGlobal("Adblock");
 	await ensureGlobal("AdblockPlugin");
 	await ensureGlobal("DarkModePlugin");
+	await ensureGlobal("AutoplayBlockPlugin");
+	await ensureGlobal("NewTabCapturePlugin");
 
 	const [{ default: libcurlTransport }, { Controller }, utils] =
 		await Promise.all([
@@ -119,6 +121,8 @@ async function initBrowser() {
 		CatchEscapedLinksPlugin: utils.CatchEscapedLinksPlugin,
 		AdblockPlugin: window.AdblockPlugin,
 		DarkModePlugin: window.DarkModePlugin,
+		AutoplayBlockPlugin: window.AutoplayBlockPlugin,
+		NewTabCapturePlugin: window.NewTabCapturePlugin,
 	};
 }
 
@@ -167,6 +171,86 @@ const tabs = [];
 let activeTab = null;
 let tabIdCounter = 1;
 
+/** Named popup targets (window.open / target="name") reuse their inner tab. */
+const namedTabs = new Map();
+
+/**
+ * Normalize a URL handed back from proxied content for inner-tab navigation.
+ * Returns null for empty/about:blank (blank inner tab). Unwraps an escaped
+ * shell URL (/?goto=…) so we never proxy-in-proxy.
+ */
+function normalizeOpenUrl(url) {
+	if (url == null) return null;
+	const s = String(url).trim();
+	if (!s || s.toLowerCase() === "about:blank") return null;
+	try {
+		const u = new URL(s, location.href);
+		if (
+			u.origin === location.origin &&
+			u.pathname === "/" &&
+			u.searchParams.has("goto")
+		) {
+			return u.searchParams.get("goto") || null;
+		}
+	} catch (err) {
+		// not parseable — let search()/frame.go validate
+	}
+	return s;
+}
+
+function innerTabHandle(tab) {
+	return {
+		tab,
+		navigate: (url) => {
+			if (!tabs.includes(tab)) return;
+			const next = normalizeOpenUrl(url);
+			activateTab(tab);
+			if (!next) return;
+			navigateInTab(tab, next).catch((err) =>
+				showError("Request failed.", err.toString())
+			);
+		},
+		close: () => closeTab(tab),
+		get closed() {
+			return !tabs.includes(tab);
+		},
+	};
+}
+
+/**
+ * Open a URL in a NEW inner proxy tab — never a real browser tab.
+ * `targetName` reuses an existing inner tab for named windows.
+ * Returns a handle ({ tab, navigate(url), close(), closed }) wired into
+ * the window.open stub. Synchronous (like window.open) — navigation
+ * proceeds async.
+ */
+function openProxyTab(rawUrl, targetName = "") {
+	const name = (targetName || "").trim();
+	if (name) {
+		const existing = namedTabs.get(name);
+		if (existing && tabs.includes(existing)) {
+			const next = normalizeOpenUrl(rawUrl);
+			activateTab(existing);
+			if (next) {
+				navigateInTab(existing, next).catch((err) =>
+					showError("Request failed.", err.toString())
+				);
+			}
+			return innerTabHandle(existing);
+		}
+		if (existing) namedTabs.delete(name);
+	}
+	const next = normalizeOpenUrl(rawUrl);
+	const tab = createTab();
+	if (name) namedTabs.set(name, tab);
+	if (next) {
+		navigateInTab(tab, next).catch((err) =>
+			showError("Request failed.", err.toString())
+		);
+	}
+	return innerTabHandle(tab);
+}
+
 function createScramjetFrame(tab) {
 	const element = document.createElement("iframe");
 	element.className = "sj-frame";
@@ -195,8 +279,40 @@ function createScramjetFrame(tab) {
 			}
 		})()
 	);
+	const autoplayBlock = new browserApi.AutoplayBlockPlugin(
+		// Verbose per-page logs. Enable with
+		// `localStorage.setItem("sj-debug", "1")` in the outer console.
+		(() => {
+			try {
+				return localStorage.getItem("sj-debug") === "1";
+			} catch (err) {
+				return false;
+			}
+		})()
+	);
+	const newtabCapture = new browserApi.NewTabCapturePlugin(
+		// Route every new-tab/new-window request into an inner proxy tab —
+		// a real browser tab must never open.
+		(url, target) => openProxyTab(url, target),
+		// Verbose per-page logs. Enable with
+		// `localStorage.setItem("sj-debug", "1")` in the outer console.
+		(() => {
+			try {
+				return localStorage.getItem("sj-debug") === "1";
+			} catch (err) {
+				return false;
+			}
+		})()
+	);
 	const frame = controller.createFrame(element, {
-		plugins: [urlWatcher, catchEscapedLinks, adblock, darkmode],
+		plugins: [
+			urlWatcher,
+			catchEscapedLinks,
+			adblock,
+			darkmode,
+			autoplayBlock,
+			newtabCapture,
+		],
 	});
 
 	element.addEventListener("load", () => {
@@ -355,6 +471,9 @@ function closeTab(tab) {
 
 	const wasActive = tab === activeTab;
 	tabs.splice(index, 1);
+	for (const [name, named] of namedTabs) {
+		if (named === tab) namedTabs.delete(name);
+	}
 	if (tab.loadTimer) clearTimeout(tab.loadTimer);
 	if (tab.frame) tab.frame.element.remove();
 
@@ -466,7 +585,7 @@ form.addEventListener("submit", async (event) => {
 	address.blur();
 });
 
-async function navigate(url) {
+async function ensureController() {
 	await registerSW();
 
 	if (!browserApi) browserApi = await initBrowser();
@@ -488,21 +607,24 @@ async function navigate(url) {
 
 		errorWrap.hidden = true;
 	}
+}
 
-	const target = search(url, searchEngine.value);
+async function navigateInTab(tab, rawUrl) {
+	await ensureController();
 
-	if (!activeTab.frame) {
-		const frame = createScramjetFrame(activeTab);
-		activeTab.frame = frame;
-		activeTab.element = frame.element;
+	const target = search(rawUrl, searchEngine.value);
+
+	if (!tab.frame) {
+		const frame = createScramjetFrame(tab);
+		tab.frame = frame;
+		tab.element = frame.element;
 		frameHost.appendChild(frame.element);
-		activeTab.lastUrl = target;
+		tab.lastUrl = target;
 		homeScreen.hidden = true;
 		frameHost.hidden = false;
-		activateTab(activeTab);
+		activateTab(tab);
 	}
 
-	const tab = activeTab;
 	tab.frame.go(target);
 	tab.lastUrl = target;
 	tab.loading = true;
@@ -523,7 +645,37 @@ async function navigate(url) {
 	syncTitle(tab);
 }
 
+async function navigate(url) {
+	try {
+		await navigateInTab(activeTab, url);
+	} catch (err) {
+		showError("Request failed.", err.toString());
+	}
+	address.blur();
+}
+
 createTab();
+
+// A real browser tab that escaped anyway (right-click > "Open link in new
+// tab" dispatches no page event, so it can't be intercepted) lands back in
+// the shell via CatchEscapedLinksPlugin (/?goto=…). If another shell opened
+// us, hand the URL back to it as an inner tab instead of browsing here.
+window.addEventListener("message", (event) => {
+	try {
+		if (event.origin !== location.origin) return;
+		const data = event.data;
+		if (
+			data &&
+			data.type === "sj-open-tab" &&
+			typeof data.url === "string" &&
+			data.url
+		) {
+			openProxyTab(data.url, data.target || "");
+		}
+	} catch (err) {
+		// ignore bad messages
+	}
+});
 
 // Paint the toggle initial states (engine badge updates itself).
 if (window.Adblock) window.Adblock.updateBadge();
@@ -531,6 +683,20 @@ if (window.Adblock) window.Adblock.updateBadge();
 (async () => {
 	const goto = new URL(location.href).searchParams.get("goto");
 	if (goto) {
+		let forwarded = false;
+		try {
+			if (window.opener && !window.opener.closed) {
+				window.opener.postMessage(
+					{ type: "sj-open-tab", url: goto, target: "" },
+					location.origin
+				);
+				window.close();
+				forwarded = window.closed === true;
+			}
+		} catch (err) {
+			// fall through to self-navigation
+		}
+		if (forwarded) return;
 		try {
 			await navigate(goto);
 			history.replaceState(null, "", location.pathname || "/");
